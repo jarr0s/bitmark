@@ -2142,18 +2142,12 @@ bool ConnectBlock(CBlock& block, CValidationState& state, CBlockIndex* pindex, C
     if (!CheckBlock(block, state, !fJustCheck, !fJustCheck))
         return false;
 
-    // Force min version after fork 2.
-    if (Params().OnFork2(pindex->nHeight) && GetBlockVersion(block.nVersion) < 5) {
-        LogPrintf("nVersion<5 and after Fork 2\n");
-        return false;
-    }
-
     // Force min version after fork 1.
     if (onFork(pindex) && GetBlockVersion(block.nVersion) < 4) {
       LogPrintf("nVersion<4 and after Fork 1\n");
       return false;
     }
-    
+
     // Check SSF
     if (onFork(pindex)) { //new multi algo blocks are identified like this
       CBlockIndex * pprev_algo = pindex;
@@ -2923,14 +2917,14 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CDiskBlockPos* dbp)
         pindexPrev = (*mi).second;
         nHeight = pindexPrev->nHeight+1;	
 
-        // Check proof of work
-	int block_algo = GetAlgo(block.nVersion);
-	unsigned int next_work_required = GetNextWorkRequired(pindexPrev, block_algo);
+            // Check proof of work
+        int block_algo = GetAlgo(block.nVersion);
+        unsigned int next_work_required = GetNextWorkRequired(pindexPrev, block_algo);
         if (block.nBits != next_work_required) {
-	  LogPrintf("nbits = %d, required = %d\n",block.nBits,next_work_required);
-	  return state.DoS(100, error("AcceptBlock() : incorrect proof of work"),
-			   REJECT_INVALID, "bad-diffbits");
-	}
+          LogPrintf("nbits = %d, required = %d\n",block.nBits,next_work_required);
+          return state.DoS(100, error("AcceptBlock() : incorrect proof of work"),
+                   REJECT_INVALID, "bad-diffbits");
+        }
 
         // Check timestamp against prev
         if (block.GetBlockTime() <= pindexPrev->GetMedianTimePast())
@@ -2972,18 +2966,24 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CDiskBlockPos* dbp)
 
         // Reject block.nVersion=2 blocks when 95% of the network has upgraded:
 
-	if (block.nVersion < 3 &&
-	    CBlockIndex::IsSuperMajority(3, pindexPrev, 950, 1000))
-	  {
-	    return state.Invalid(error("AcceptBlock() : rejected nVersion=2 block"),
-				 REJECT_OBSOLETE, "bad-version");
-	  }
+        if (block.nVersion < 3 &&
+            CBlockIndex::IsSuperMajority(3, pindexPrev, 950, 1000))
+          {
+            return state.Invalid(error("AcceptBlock() : rejected nVersion=2 block"),
+                     REJECT_OBSOLETE, "bad-version");
+          }
 
-	if (block.IsAuxpow() || block.GetAlgo() != ALGO_SCRYPT) {
-	  if (pindexPrev->nHeight < nForkHeight-1 || !CBlockIndex::IsSuperMajority(4,pindexPrev,75,100)) {
-	    return state.DoS(100,error("AcceptBlock() : new block format requires fork activation"),REJECT_INVALID,"bad-version-fork");
-	  }
-	}	
+        if (block.IsAuxpow() || block.GetAlgo() != ALGO_SCRYPT) {
+          if (pindexPrev->nHeight < nForkHeight-1 || !CBlockIndex::IsSuperMajority(4,pindexPrev,75,100)) {
+            return state.DoS(100,error("AcceptBlock() : new block format requires fork activation"),REJECT_INVALID,"bad-version-fork");
+          }
+        }
+
+            // Force min version after fork 2.
+        if (Params().OnFork2(nHeight) && GetBlockVersion(block.nVersion) < 5) {
+            LogPrintf("nVersion<5 and after Fork 2\n");
+            return false;
+        }
     }
 
     // Write block to history file
